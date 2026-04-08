@@ -8,11 +8,15 @@ import type { EntitySchema } from '@mostajs/orm'
  * @param options.currency   - Default currency (default: 'USD')
  * @param options.relationTarget - Related entity name (e.g. 'Reservation', 'Order')
  * @param options.relationRequired - Whether the relation is required
+ * @param options.subscriptionTarget - Optional relation to Subscription entity
+ * @param options.invoiceTarget - Optional relation to Invoice entity
  */
 export function createPaymentSchema(options?: {
   currency?: string
   relationTarget?: string
   relationRequired?: boolean
+  subscriptionTarget?: string
+  invoiceTarget?: string
 }): EntitySchema {
   const schema: EntitySchema = {
     name: 'Payment',
@@ -41,6 +45,26 @@ export function createPaymentSchema(options?: {
       target: options.relationTarget,
       type: 'many-to-one',
       required: options.relationRequired ?? false,
+    }
+    schema.indexes!.push({ fields: { [relKey]: 'asc' } })
+  }
+
+  if (options?.subscriptionTarget) {
+    const relKey = options.subscriptionTarget.toLowerCase()
+    schema.relations![relKey] = {
+      target: options.subscriptionTarget,
+      type: 'many-to-one',
+      required: false,
+    }
+    schema.indexes!.push({ fields: { [relKey]: 'asc' } })
+  }
+
+  if (options?.invoiceTarget) {
+    const relKey = options.invoiceTarget.toLowerCase()
+    schema.relations![relKey] = {
+      target: options.invoiceTarget,
+      type: 'many-to-one',
+      required: false,
     }
     schema.indexes!.push({ fields: { [relKey]: 'asc' } })
   }
