@@ -14,6 +14,9 @@ export type {
   PaymentDTO,
 } from './types/index.js'
 
+// Stripe types (client-safe)
+export type { WebhookHandlers } from './lib/stripe.js'
+
 // Schema
 export { PaymentSchema, createPaymentSchema } from './schemas/payment.schema.js'
 

@@ -2,7 +2,11 @@
 // Author: Dr Hamid MADANI drmdh@msn.com
 
 // Stripe
-export { createStripeClient, createCheckoutSession, handleWebhook } from './lib/stripe.js'
+export {
+  createStripeClient, createCheckoutSession, handleWebhook,
+  createBillingSession, createPortalSession, handleBillingWebhook,
+} from './lib/stripe.js'
+export type { WebhookHandlers } from './lib/stripe.js'
 
 // Repository
 export { getPaymentRepo, resetPaymentRepo } from './lib/payment-factory.js'

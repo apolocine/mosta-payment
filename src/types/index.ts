@@ -7,6 +7,8 @@ export type PaymentMethodType = 'card' | 'transfer' | 'cash' | 'tpe'
 export interface PaymentConfig {
   /** Default currency code (e.g. 'USD', 'EUR', 'DZD') */
   currency: string
+  /** Fallback currency (used when no currency in request) */
+  defaultCurrency?: string
   /** Stripe secret key (server-side only) */
   stripeSecretKey?: string
   /** Stripe public key (client-side) */

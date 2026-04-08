@@ -1,6 +1,6 @@
 {
   "name": "@mostajs/payment",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Payment module for @mostajs — Stripe checkout, multi-method (card, transfer, cash), multi-currency",
   "author": "Dr Hamid MADANI <drmdh@msn.com>",
   "license": "MIT",
@@ -26,6 +26,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "test": "tsx test-scripts/test-unit.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -33,19 +34,25 @@
   },
   "peerDependencies": {
     "@mostajs/orm": ">=1.8.0",
-    "react": ">=18.0.0",
-    "next": ">=14.0.0"
+    "next": ">=14.0.0",
+    "react": ">=18.0.0"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true },
-    "next": { "optional": true }
+    "react": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@mostajs/orm": "^1.8.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
+    "better-sqlite3": "^12.8.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   },
   "repository": {
