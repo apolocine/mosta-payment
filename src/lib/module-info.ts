@@ -11,6 +11,6 @@ export const moduleInfo = {
   name: 'payment',
   label: 'Payment',
   description: 'Payment processing — Stripe, bank transfer, cash',
-  version: '0.2.0',
+  version: '0.3.0',
   schemas: ['Payment'],
 }

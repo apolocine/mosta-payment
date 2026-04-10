@@ -66,7 +66,7 @@ async function run() {
   // ── T3 — Module info ──
   console.log('T3 — Module info')
   assert(moduleInfo.name === 'payment', 'moduleInfo.name === payment')
-  assert(moduleInfo.version === '0.2.0', 'moduleInfo.version === 0.2.0')
+  assert(moduleInfo.version === '0.3.0', 'moduleInfo.version === 0.3.0')
   assert(getSchemas().length === 1, 'getSchemas() → 1 schema')
   assert(getSchemas()[0].name === 'Payment', 'getSchemas()[0].name === Payment')
   console.log('')
