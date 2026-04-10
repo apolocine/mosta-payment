@@ -1,7 +1,7 @@
 {
   "name": "@mostajs/payment",
-  "version": "0.2.0",
-  "description": "Payment module for @mostajs — Stripe checkout, multi-method (card, transfer, cash), multi-currency",
+  "version": "0.3.0",
+  "description": "Payment module for @mostajs — Multi-provider (Stripe, Satim/CIB, Chargily, PayPal), multi-method, multi-currency",
   "author": "Dr Hamid MADANI <drmdh@msn.com>",
   "license": "MIT",
   "type": "module",
