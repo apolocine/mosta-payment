@@ -3,7 +3,7 @@
   "version": "0.3.1",
   "description": "Payment module for @mostajs — Multi-provider (Stripe, Satim/CIB, Chargily, PayPal), multi-method, multi-currency",
   "author": "Dr Hamid MADANI <drmdh@msn.com>",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
