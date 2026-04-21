@@ -4,6 +4,7 @@
 // GitHub: https://github.com/chargily
 
 import type { PaymentProvider, CheckoutParams, CheckoutResult, CustomerParams, WebhookEvent } from '../core/provider.interface.js'
+import { getEnv } from '@mostajs/config'
 import { createHmac } from 'node:crypto'
 
 export interface ChargilyConfig {
@@ -122,10 +123,10 @@ export class ChargilyProvider implements PaymentProvider {
  */
 export function createChargilyProvider(config?: Partial<ChargilyConfig>): ChargilyProvider {
   return new ChargilyProvider({
-    apiKey: config?.apiKey ?? process.env.CHARGILY_API_KEY ?? '',
-    testMode: config?.testMode ?? process.env.CHARGILY_TEST_MODE !== 'false',
-    successUrl: config?.successUrl ?? process.env.CHARGILY_SUCCESS_URL ?? '/payment/success',
-    failureUrl: config?.failureUrl ?? process.env.CHARGILY_FAILURE_URL ?? '/payment/failed',
-    webhookUrl: config?.webhookUrl ?? process.env.CHARGILY_WEBHOOK_URL,
+    apiKey: config?.apiKey ?? getEnv('CHARGILY_API_KEY', ''),
+    testMode: config?.testMode ?? getEnv('CHARGILY_TEST_MODE') !== 'false',
+    successUrl: config?.successUrl ?? getEnv('CHARGILY_SUCCESS_URL', '/payment/success'),
+    failureUrl: config?.failureUrl ?? getEnv('CHARGILY_FAILURE_URL', '/payment/failed'),
+    webhookUrl: config?.webhookUrl ?? getEnv('CHARGILY_WEBHOOK_URL'),
   })
 }

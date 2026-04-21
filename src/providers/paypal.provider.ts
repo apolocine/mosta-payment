@@ -3,6 +3,7 @@
 // Ref: https://developer.paypal.com/docs/api/orders/v2/
 
 import type { PaymentProvider, CheckoutParams, CheckoutResult, RefundParams, RefundResult, WebhookEvent } from '../core/provider.interface.js'
+import { getEnv } from '@mostajs/config'
 import { createVerify } from 'node:crypto'
 
 export interface PayPalConfig {
@@ -174,11 +175,11 @@ export class PayPalProvider implements PaymentProvider {
  */
 export function createPayPalProvider(config?: Partial<PayPalConfig>): PayPalProvider {
   return new PayPalProvider({
-    clientId: config?.clientId ?? process.env.PAYPAL_CLIENT_ID ?? '',
-    secret: config?.secret ?? process.env.PAYPAL_SECRET ?? '',
-    testMode: config?.testMode ?? process.env.PAYPAL_TEST_MODE !== 'false',
-    returnUrl: config?.returnUrl ?? process.env.PAYPAL_RETURN_URL ?? '/payment/success',
-    cancelUrl: config?.cancelUrl ?? process.env.PAYPAL_CANCEL_URL ?? '/payment/canceled',
-    webhookId: config?.webhookId ?? process.env.PAYPAL_WEBHOOK_ID,
+    clientId: config?.clientId ?? getEnv('PAYPAL_CLIENT_ID', ''),
+    secret: config?.secret ?? getEnv('PAYPAL_SECRET', ''),
+    testMode: config?.testMode ?? getEnv('PAYPAL_TEST_MODE') !== 'false',
+    returnUrl: config?.returnUrl ?? getEnv('PAYPAL_RETURN_URL', '/payment/success'),
+    cancelUrl: config?.cancelUrl ?? getEnv('PAYPAL_CANCEL_URL', '/payment/canceled'),
+    webhookId: config?.webhookId ?? getEnv('PAYPAL_WEBHOOK_ID'),
   })
 }

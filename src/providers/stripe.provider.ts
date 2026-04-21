@@ -2,6 +2,7 @@
 // Author: Dr Hamid MADANI drmdh@msn.com
 
 import Stripe from 'stripe'
+import { getEnv } from '@mostajs/config'
 import type {
   PaymentProvider, CheckoutParams, CheckoutResult, CustomerParams,
   SubscriptionParams, SubscriptionResult, RefundParams, RefundResult,
@@ -229,7 +230,7 @@ export class StripeProvider implements PaymentProvider {
  */
 export function createStripeProvider(config?: Partial<StripeConfig>): StripeProvider {
   return new StripeProvider({
-    secretKey: config?.secretKey ?? process.env.STRIPE_SECRET_KEY ?? '',
-    webhookSecret: config?.webhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET,
+    secretKey: config?.secretKey ?? getEnv('STRIPE_SECRET_KEY', ''),
+    webhookSecret: config?.webhookSecret ?? getEnv('STRIPE_WEBHOOK_SECRET'),
   })
 }

@@ -3,6 +3,7 @@
 // Ref: https://test.satim.dz/payment/rest/ (sandbox)
 
 import type { PaymentProvider, CheckoutParams, CheckoutResult, WebhookEvent } from '../core/provider.interface.js'
+import { getEnv, getEnvBool } from '@mostajs/config'
 
 export interface SatimConfig {
   merchantId: string
@@ -125,10 +126,10 @@ export class SatimProvider implements PaymentProvider {
  */
 export function createSatimProvider(config?: Partial<SatimConfig>): SatimProvider {
   return new SatimProvider({
-    merchantId: config?.merchantId ?? process.env.SATIM_MERCHANT_ID ?? '',
-    password: config?.password ?? process.env.SATIM_PASSWORD ?? '',
-    testMode: config?.testMode ?? process.env.SATIM_TEST_MODE === 'true',
-    returnUrl: config?.returnUrl ?? process.env.SATIM_RETURN_URL ?? '/payment/callback',
-    failUrl: config?.failUrl ?? process.env.SATIM_FAIL_URL ?? '/payment/failed',
+    merchantId: config?.merchantId ?? getEnv('SATIM_MERCHANT_ID', ''),
+    password: config?.password ?? getEnv('SATIM_PASSWORD', ''),
+    testMode: config?.testMode ?? getEnvBool('SATIM_TEST_MODE'),
+    returnUrl: config?.returnUrl ?? getEnv('SATIM_RETURN_URL', '/payment/callback'),
+    failUrl: config?.failUrl ?? getEnv('SATIM_FAIL_URL', '/payment/failed'),
   })
 }
