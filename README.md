@@ -162,6 +162,46 @@ etc. keep working unchanged — the cascade is fully backward-compatible.
 
 ## Changelog
 
+### v0.4.1 — 2026-05-04 — Découplage `@mostajs/orm` via façade `data-plug` + WeakMap repo
+
+Étape 3 du chantier *« system dialect séparé »* — applique deux fix qui se combinent.
+
+#### 1. Migration `@mostajs/orm` → `@mostajs/data-plug` *(façade)*
+
+Conformément au principe **« les modules @mostajs passent par data-plug, jamais hardcoder un dialect ou importer @mostajs/orm directement »**, `payment` ne dépend plus de `@mostajs/orm` en `peerDependency`. Tous les imports de production passent désormais par `@mostajs/data-plug v1.2.4` *(qui ré-exporte `BaseRepository`, `IDialect`, `EntitySchema`, …)*.
+
+**4 fichiers migrés** :
+
+| Fichier | Symboles |
+|---------|----------|
+| `src/api/payments.route.ts` | `IDialect` |
+| `src/lib/module-info.ts` | `EntitySchema` |
+| `src/lib/payment-factory.ts` | `BaseRepository` + `IDialect` |
+| `src/schemas/payment.schema.ts` | `EntitySchema` |
+| `package.json` | `peerDep` `orm` → `data-plug` |
+
+`@mostajs/orm` reste en `devDependency` uniquement *(cohérence avec le `test-unit` qui pourrait l'instancier — sera revu plus tard)*.
+
+#### 2. WeakMap dans `payment-factory.ts`
+
+```ts
+// Avant — capture la référence du PREMIER dialect, ignore les suivants
+let cachedRepo: BaseRepository<PaymentDTO> | null = null
+
+// Après — keyed par identité du dialect
+const cache = new WeakMap<IDialect, BaseRepository<PaymentDTO>>()
+```
+
+Évite que le repo capture la référence du PREMIER dialect passé et ignore tous les suivants. Lorsque `/api/change-dialect` *(ou rotation système ↔ métier)* modifie le dialect courant, le cache miss force la reconstruction du repo avec la **nouvelle** instance dialect — au lieu de réutiliser un repo pointant vers une connexion morte.
+
+`resetPaymentRepo()` conservé en no-op pour rétro-compat *(la WeakMap auto-libère naturellement les entrées dont le dialect n'est plus référencé)*.
+
+#### Bump
+
+`0.4.0 → 0.4.1` *(patch — découplage interne, signatures publiques inchangées)*.
+
+---
+
 ### v0.4.0 — 2026-04-21
 
 **Added** : all four provider factories (`createStripeProvider`,
