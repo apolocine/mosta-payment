@@ -1,7 +1,7 @@
 // @mostajs/payment — Module info
 // Author: Dr Hamid MADANI drmdh@msn.com
 import { PaymentSchema } from '../schemas/payment.schema.js'
-import type { EntitySchema } from '@mostajs/orm'
+import type { EntitySchema } from '@mostajs/data-plug'
 
 export function getSchemas(): EntitySchema[] {
   return [PaymentSchema]

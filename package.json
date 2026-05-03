@@ -1,6 +1,6 @@
 {
   "name": "@mostajs/payment",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Payment module for @mostajs — Multi-provider (Stripe, Satim/CIB, Chargily, PayPal), multi-method, multi-currency",
   "author": "Dr Hamid MADANI <drmdh@msn.com>",
   "license": "AGPL-3.0-or-later",
@@ -34,7 +34,7 @@
     "stripe": "^17.0.0"
   },
   "peerDependencies": {
-    "@mostajs/orm": ">=1.8.0",
+    "@mostajs/data-plug": "^1.2.4",
     "next": ">=14.0.0",
     "react": ">=18.0.0"
   },
@@ -47,6 +47,7 @@
     }
   },
   "devDependencies": {
+    "@mostajs/data-plug": "^1.2.4",
     "@mostajs/orm": "^1.8.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",

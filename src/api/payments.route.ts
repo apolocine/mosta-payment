@@ -1,6 +1,6 @@
 // @mostajs/payment — Payment CRUD API route handlers
 // Author: Dr Hamid MADANI drmdh@msn.com
-import type { IDialect } from '@mostajs/orm'
+import type { IDialect } from '@mostajs/data-plug'
 import type { PaymentDTO } from '../types/index.js'
 import { getPaymentRepo } from '../lib/payment-factory.js'
 
