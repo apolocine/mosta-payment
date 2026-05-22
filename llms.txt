@@ -1,0 +1,92 @@
+# @mostajs/payment — fiche LLM
+> Module de paiement multi-provider (Stripe, Satim/CIB, Chargily, PayPal, Manuel), multi-méthode, multi-devise.
+
+- Version: 0.5.3 · Licence: AGPL-3.0-or-later · Auteur: Dr Hamid MADANI <drmdh@msn.com>
+- Chemin: mostajs/mosta-payment · Statut audit: complet (dist/)
+
+## RÔLE
+Abstraction unifiée du paiement pour l'écosystème `@mostajs/*`. Un contrat `PaymentProvider` commun couvre 5 providers (Stripe, Satim, Chargily, PayPal, Manuel). Fournit checkout, webhooks normalisés, billing/abonnements (Stripe), schéma ORM `Payment`, composant React `PaymentPage` et handlers de routes Next.js App Router. Sélection automatique du provider par devise (DZD → Chargily, autres → Stripe).
+
+## INSTALLATION
+npm i @mostajs/payment stripe
+
+## EXPORTS
+Entrée `.` (client + serveur léger) :
+- Composant React: `PaymentPage`
+- Schémas: `PaymentSchema`, `createPaymentSchema`
+- Constante: `moduleInfo`
+- Types: `PaymentConfig`, `PaymentStatus`, `PaymentMethodType`, `LineItem`, `CheckoutRequest`, `CheckoutResult`, `OrderSummary`, `PaymentDTO`, `WebhookHandlers`
+
+## EXPORTS PAR SOUS-CHEMIN
+Entrée `@mostajs/payment/server` (serveur uniquement) :
+- Engine: `registerProvider`, `setDefaultProvider`, `getProvider`, `listProviders`, `getProviderForCurrency`, `resetProviders`
+- Providers (classes + factories env): `StripeProvider`/`createStripeProvider`, `SatimProvider`/`createSatimProvider`, `ChargilyProvider`/`createChargilyProvider`, `PayPalProvider`/`createPayPalProvider`, `ManualProvider`/`createManualProvider`
+- Stripe bas niveau: `createStripeClient`, `createCheckoutSession`, `handleWebhook`, `createBillingSession`, `createPortalSession`, `handleBillingWebhook`
+- Webhook helpers: `handleProviderWebhook`, `pickSignatureHeader`, `getProviderByName`, `isPaidEvent`, `isFailedEvent`, `isRefundedEvent`, `extractOrderId`, `pickProviderByCurrency`, `isKnownProvider`, constantes `KNOWN_PROVIDERS`, `CURRENCY_TO_PROVIDER`
+- Repo: `getPaymentRepo`, `resetPaymentRepo`
+- Routes Next.js: `createCheckoutHandler`, `createPaymentHandlers`
+- Module: `getSchemas`, `moduleInfo`, `paymentModuleRegistration`
+- Types: `PaymentProvider`, `CheckoutParams`, `CheckoutResult`, `CustomerParams`, `SubscriptionParams`, `SubscriptionResult`, `RefundParams`, `RefundResult`, `InvoiceResult`, `WebhookEvent`, `ProviderName`, `HandleProviderWebhookArgs`, `HandleProviderWebhookResult`, configs `StripeConfig`/`SatimConfig`/`ChargilyConfig`/`PayPalConfig`/`ManualConfig`, `SmtpDriverConfig` n/a
+
+## API — SIGNATURES
+- `createPaymentSchema(options?: { currency?; relationTarget?; relationRequired?; subscriptionTarget?; invoiceTarget? }): EntitySchema`
+- `createCheckoutHandler(config: PaymentConfig): (req: Request) => Promise<Response>`
+- `createPaymentHandlers(dialect: IDialect): { GET; POST }`
+- `getPaymentRepo(dialect: IDialect): BaseRepository<PaymentDTO>` — cache WeakMap par identité du dialect
+- `registerProvider(p: PaymentProvider): void` · `setDefaultProvider(name): void` · `getProvider(name?): PaymentProvider` · `getProviderForCurrency(currency): PaymentProvider | null`
+- `pickProviderByCurrency(currency, fallback?: ProviderName): { name; provider }`
+- `handleProviderWebhook(args: HandleProviderWebhookArgs): Promise<HandleProviderWebhookResult>`
+- `isPaidEvent/isFailedEvent/isRefundedEvent(event: WebhookEvent): boolean` · `extractOrderId(event): string | null`
+- Stripe: `createStripeClient(config)`, `createCheckoutSession(stripe, request, config)`, `handleWebhook(stripe, body, sig, secret)`, `createBillingSession(stripe, {...})`, `createPortalSession(stripe, customerId, returnUrl)`, `handleBillingWebhook(stripe, body, sig, secret, handlers)`
+Interface `PaymentProvider` : `name`, `supportedCurrencies`, `supportedMethods`, `createCheckout(params)`, `verifyWebhook(body, sig)` requis ; `createCustomer/getCustomer/updateCustomer/createSubscription/getSubscription/cancelSubscription/changeSubscription/pauseSubscription/resumeSubscription/createRefund/listInvoices/getUpcomingInvoice/createPortal` optionnels.
+
+## TYPES CLÉS
+- `PaymentStatus = 'pending'|'paid'|'refunded'|'failed'`
+- `PaymentMethodType = 'card'|'transfer'|'cash'|'tpe'`
+- `ProviderName = 'chargily'|'stripe'|'satim'|'paypal'|'manual'`
+- `PaymentConfig { currency: string; defaultCurrency?; stripeSecretKey?; stripePublicKey?; stripeWebhookSecret?; successUrlTemplate: string; cancelUrlTemplate: string; methods?: PaymentMethodType[]; bankInfo?: { rib; bankName; holder } }` — templates avec `{orderId}` substitué
+- `LineItem { name; description?; unitAmount: number; quantity: number }` — unitAmount en unités de base (PAS en centimes)
+- `CheckoutRequest { orderId; lineItems: LineItem[]; currency?; returnUrl?; metadata? }`
+- `CheckoutResult { url: string | null; sessionId: string }`
+- `CheckoutParams { orderId; amount; currency?; description?; successUrl; cancelUrl; webhookUrl?; metadata?; customerId?; priceId?; trialDays? }`
+- `WebhookEvent { type: string; data: Record<string,unknown>; raw? }`
+- `HandleProviderWebhookResult = { ok: true; event: WebhookEvent } | { ok: false; reason: 'bad_signature'|'malformed'|'unknown_provider'; error: string }`
+- `PaymentDTO { id; amount; currency; method: PaymentMethodType; status: PaymentStatus; transactionRef?; paidAt?: Date; orderId? }`
+- `WebhookHandlers { onCheckoutCompleted?; onInvoicePaid?; onSubscriptionUpdated?; onSubscriptionDeleted?; onPaymentFailed? }`
+
+## PATTERN
+```ts
+// Route checkout Next.js
+import { createCheckoutHandler } from '@mostajs/payment/server'
+export const POST = createCheckoutHandler({
+  currency: 'EUR',
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+  successUrlTemplate: '/confirmation/{orderId}?paid=true',
+  cancelUrlTemplate: '/payment/{orderId}?cancelled=true',
+})
+
+// Webhook provider-agnostic
+import { handleProviderWebhook, isPaidEvent, extractOrderId } from '@mostajs/payment/server'
+const r = await handleProviderWebhook({ body: await req.text(), headers: req.headers, providerName: 'chargily' })
+if (!r.ok) return Response.json({ error: r.error }, { status: 400 })
+if (isPaidEvent(r.event)) { /* MAJ DB métier via extractOrderId(r.event) */ }
+```
+
+## DÉPEND DE
+- `@mostajs/config` (dependency) — résolution env avec cascade `MOSTA_ENV` (`TEST_*`/`DEV_*`/`PROD_*`).
+- `@mostajs/data-plug` (peer dep `^1.2.4`) — façade ORM : `BaseRepository`, `IDialect`, `EntitySchema`. Le module n'importe jamais `@mostajs/orm` directement.
+- `stripe` (dependency) — SDK Stripe.
+- `next` et `react` en peer deps optionnelles (routes + `PaymentPage`).
+
+## PIÈGES
+- `LineItem.unitAmount` est en unités de base de la devise, pas en centimes — la conversion Stripe est interne.
+- Le body du webhook DOIT être lu brut (`req.text()`) avant tout parse JSON : la signature est calculée sur les bytes exacts.
+- Le sous-chemin `/server` contient toute la logique sensible (clés, providers) — ne jamais l'importer côté client ; `PaymentPage`/`PaymentSchema` sont sur `.`.
+- Sélection devise : `CURRENCY_TO_PROVIDER` mappe DZD → Chargily, le reste → Stripe ; pour CIB-only Algérie sans Chargily, passer `fallback` à `pickProviderByCurrency`.
+- Les factories `create*Provider` lisent l'env en fallback (cascade `@mostajs/config`) ; defaults testMode : Chargily test-on (`!== 'false'`), Satim test-off (`=== 'true'`), PayPal test-on.
+- `ChargilyProvider` : préférer `CHARGILY_SECRET_KEY` ; `CHARGILY_API_KEY` est un alias legacy.
+- `getPaymentRepo` met en cache via WeakMap par identité de dialect — un changement de dialect reconstruit le repo ; `resetPaymentRepo` est un no-op de rétro-compat.
+- Méthodes optionnelles de `PaymentProvider` (subscriptions, refunds…) : seul Stripe les implémente toutes ; vérifier la présence avant appel sur Satim/Chargily/Manual.
+
+## RÉFÉRENCES
+README.md · docs/
