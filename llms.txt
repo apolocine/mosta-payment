@@ -1,11 +1,11 @@
 # @mostajs/payment — fiche LLM
 > Module de paiement multi-provider (Stripe, Satim/CIB, Chargily, PayPal, Manuel), multi-méthode, multi-devise.
 
-- Version: 0.7.0 · Licence: AGPL-3.0-or-later · Auteur: Dr Hamid MADANI <drmdh@msn.com>
+- Version: 0.8.0 · Licence: AGPL-3.0-or-later · Auteur: Dr Hamid MADANI <drmdh@msn.com>
 - Chemin: mostajs/mosta-payment · Statut audit: complet (dist/)
 
 ## RÔLE
-Abstraction unifiée du paiement pour l'écosystème `@mostajs/*`. Un contrat `PaymentProvider` commun couvre **7 dialectes** (Stripe, Satim, Chargily, PayPal, Manuel, **SlickPay**, **Guiddini**). Fournit checkout, webhooks normalisés, billing/abonnements (Stripe), schéma ORM `Payment`, composant React `PaymentPage` et handlers de routes Next.js App Router. Sélection automatique du provider par devise (DZD → Chargily par défaut, autres → Stripe ; cibler SATIM/SlickPay/Guiddini via `providerName`).
+Abstraction unifiée du paiement pour l'écosystème `@mostajs/*`. Un contrat `PaymentProvider` commun couvre **11 dialectes** : DZ — Satim, Chargily, SlickPay, Guiddini ; international — Stripe, PayPal, Mollie, Paystack ; crypto — Coinbase Commerce, NOWPayments ; + Manuel. Fournit checkout, webhooks normalisés, billing/abonnements (Stripe), schéma ORM `Payment`, composant React `PaymentPage` et handlers de routes Next.js App Router. Sélection automatique du provider par devise (DZD → Chargily par défaut, autres → Stripe ; cibler SATIM/SlickPay/Guiddini via `providerName`).
 
 ## MODÈLE DIALECTE (v0.6) — calqué sur @mostajs/orm
 Chaque **fournisseur = un dialecte de paiement**, exactement comme un dialecte ORM :
@@ -57,7 +57,7 @@ Interface `PaymentProvider` : `name`, `supportedCurrencies`, `supportedMethods`,
 ## TYPES CLÉS
 - `PaymentStatus = 'pending'|'paid'|'refunded'|'failed'`
 - `PaymentMethodType = 'card'|'transfer'|'cash'|'tpe'`
-- `ProviderName = 'chargily'|'stripe'|'satim'|'paypal'|'manual'|'slickpay'|'guiddini'`
+- `ProviderName = 'chargily'|'stripe'|'satim'|'paypal'|'manual'|'slickpay'|'guiddini'|'coinbase'|'nowpayments'|'paystack'|'mollie'`
 - `PaymentConfig { currency: string; defaultCurrency?; stripeSecretKey?; stripePublicKey?; stripeWebhookSecret?; successUrlTemplate: string; cancelUrlTemplate: string; methods?: PaymentMethodType[]; bankInfo?: { rib; bankName; holder } }` — templates avec `{orderId}` substitué
 - `LineItem { name; description?; unitAmount: number; quantity: number }` — unitAmount en unités de base (PAS en centimes)
 - `CheckoutRequest { orderId; lineItems: LineItem[]; currency?; returnUrl?; metadata? }`
@@ -111,6 +111,7 @@ if (s.status === 'paid') { /* activer la campagne sponsor (métier) */ }
 - Les factories `create*Provider` lisent l'env en fallback (cascade `@mostajs/config`) ; defaults testMode : Chargily test-on (`!== 'false'`), Satim test-off (`=== 'true'`), PayPal test-on.
 - `ChargilyProvider` : préférer `CHARGILY_SECRET_KEY` ; `CHARGILY_API_KEY` est un alias legacy.
 - **Dialectes DZ (v0.7)** : `SatimProvider` (acquéreur direct, codes BPC OrderStatus, matching par `OrderNumber`), `SlickPayProvider` (env `SLICKPAY_PUBLIC_KEY` + base/chemins `SLICKPAY_BASE_URL`/`_INVOICE_PATH`), `GuiddiniProvider` (env `GUIDDINI_APP_KEY`/`_APP_SECRET` + `GUIDDINI_BASE_URL`/`_INITIATE_PATH`/`_STATUS_PATH`). DZD partagé : par défaut → Chargily ; cibler SATIM/SlickPay/Guiddini via `providerName` (ou ordre/`setDefault`). Confirmation par retour+statut (pas de HMAC) ; chemins SlickPay/Guiddini provisoires, pilotés par env, à confirmer en certification GIE.
+- **Dialectes vague 2 (v0.8)** : `CoinbaseProvider` (crypto, HMAC-SHA256 `X-CC-Webhook-Signature`, env `COINBASE_COMMERCE_API_KEY`/`_WEBHOOK_SECRET`, **opt-in**), `NowPaymentsProvider` (crypto, IPN HMAC-SHA512 sur **JSON aux clés triées** `x-nowpayments-sig`, env `NOWPAYMENTS_API_KEY`/`_IPN_SECRET`, **opt-in**), `PaystackProvider` (Afrique NGN/GHS/ZAR/KES, HMAC-SHA512 `x-paystack-signature`, `reference`=orderId, env `PAYSTACK_SECRET_KEY`), `MollieProvider` (EUR/GBP iDEAL/SEPA/cartes/Apple-Google Pay, webhook **non signé → re-fetch** `getPayment`, env `MOLLIE_API_KEY`). Crypto = joker devise → **exclus du routage auto** (opt-in via `providers:[…]`/`providerName`).
 - `getPaymentRepo` met en cache via WeakMap par identité de dialect — un changement de dialect reconstruit le repo ; `resetPaymentRepo` est un no-op de rétro-compat.
 - Méthodes optionnelles de `PaymentProvider` (subscriptions, refunds…) : seul Stripe les implémente toutes ; vérifier la présence avant appel sur Satim/Chargily/Manual.
 

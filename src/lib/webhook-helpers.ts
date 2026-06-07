@@ -14,14 +14,23 @@ import { createPayPalProvider } from '../providers/paypal.provider.js'
 import { createManualProvider } from '../providers/manual.provider.js'
 import { createSlickPayProvider } from '../providers/slickpay.provider.js'
 import { createGuiddiniProvider } from '../providers/guiddini.provider.js'
+import { createCoinbaseProvider } from '../providers/coinbase.provider.js'
+import { createNowPaymentsProvider } from '../providers/nowpayments.provider.js'
+import { createPaystackProvider } from '../providers/paystack.provider.js'
+import { createMollieProvider } from '../providers/mollie.provider.js'
 import type { PaymentProvider, WebhookEvent } from '../core/provider.interface.js'
 
-export type ProviderName = 'chargily' | 'stripe' | 'satim' | 'paypal' | 'manual' | 'slickpay' | 'guiddini'
+export type ProviderName =
+  | 'chargily' | 'stripe' | 'satim' | 'paypal' | 'manual' | 'slickpay' | 'guiddini'
+  | 'coinbase' | 'nowpayments' | 'paystack' | 'mollie'
 
 /** Liste exhaustive des noms de provider supportés. À étendre dans ce
  *  module quand un nouveau provider est ajouté → tous les consumers
  *  bénéficient automatiquement. */
-export const KNOWN_PROVIDERS: readonly ProviderName[] = ['chargily', 'stripe', 'satim', 'paypal', 'manual', 'slickpay', 'guiddini']
+export const KNOWN_PROVIDERS: readonly ProviderName[] = [
+  'chargily', 'stripe', 'satim', 'paypal', 'manual', 'slickpay', 'guiddini',
+  'coinbase', 'nowpayments', 'paystack', 'mollie',
+]
 
 /** Type-guard runtime — vrai si `name` est un ProviderName valide. */
 export function isKnownProvider(name: string): name is ProviderName {
@@ -43,6 +52,10 @@ export const CURRENCY_TO_PROVIDER: Readonly<Record<string, ProviderName>> = Obje
   GBP: 'stripe',
   CHF: 'stripe',
   CAD: 'stripe',
+  NGN: 'paystack',
+  GHS: 'paystack',
+  ZAR: 'paystack',
+  KES: 'paystack',
 })
 
 /**
@@ -90,6 +103,15 @@ export function pickSignatureHeader(headers: Headers | Record<string, string>, p
       // Agrégateurs SATIM : confirmation par retour + interrogation statut
       // (pas de webhook signé) → pas de header signature requis.
       return ''
+    case 'coinbase':
+      return get('x-cc-webhook-signature') || ''
+    case 'nowpayments':
+      return get('x-nowpayments-sig') || ''
+    case 'paystack':
+      return get('x-paystack-signature') || ''
+    case 'mollie':
+      // Mollie ne signe pas : id seul, re-fetch du statut.
+      return ''
     default:
       return ''
   }
@@ -108,6 +130,10 @@ export function getProviderByName(name: ProviderName): PaymentProvider {
     case 'manual':   return createManualProvider()
     case 'slickpay': return createSlickPayProvider()
     case 'guiddini': return createGuiddiniProvider()
+    case 'coinbase': return createCoinbaseProvider()
+    case 'nowpayments': return createNowPaymentsProvider()
+    case 'paystack': return createPaystackProvider()
+    case 'mollie':   return createMollieProvider()
   }
 }
 

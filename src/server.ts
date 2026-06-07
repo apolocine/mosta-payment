@@ -54,6 +54,19 @@ export type { SlickPayConfig } from './providers/slickpay.provider.js'
 export { GuiddiniProvider, createGuiddiniProvider } from './providers/guiddini.provider.js'
 export type { GuiddiniConfig } from './providers/guiddini.provider.js'
 
+// Crypto + international (vague 2) — v0.8
+export { CoinbaseProvider, createCoinbaseProvider } from './providers/coinbase.provider.js'
+export type { CoinbaseConfig } from './providers/coinbase.provider.js'
+
+export { NowPaymentsProvider, createNowPaymentsProvider } from './providers/nowpayments.provider.js'
+export type { NowPaymentsConfig } from './providers/nowpayments.provider.js'
+
+export { PaystackProvider, createPaystackProvider } from './providers/paystack.provider.js'
+export type { PaystackConfig } from './providers/paystack.provider.js'
+
+export { MollieProvider, createMollieProvider } from './providers/mollie.provider.js'
+export type { MollieConfig } from './providers/mollie.provider.js'
+
 // ─── Legacy Stripe functions (backward compat) ─
 export {
   createStripeClient, createCheckoutSession, handleWebhook,

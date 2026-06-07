@@ -23,6 +23,10 @@ import { createPayPalProvider } from '../providers/paypal.provider.js'
 import { createManualProvider } from '../providers/manual.provider.js'
 import { createSlickPayProvider } from '../providers/slickpay.provider.js'
 import { createGuiddiniProvider } from '../providers/guiddini.provider.js'
+import { createCoinbaseProvider } from '../providers/coinbase.provider.js'
+import { createNowPaymentsProvider } from '../providers/nowpayments.provider.js'
+import { createPaystackProvider } from '../providers/paystack.provider.js'
+import { createMollieProvider } from '../providers/mollie.provider.js'
 import type { ProviderName } from '../lib/webhook-helpers.js'
 
 export interface AutoRegisterOptions {
@@ -47,6 +51,10 @@ function isConfigured(name: ProviderName): boolean {
     case 'paypal':   return !!getEnv('PAYPAL_CLIENT_ID')
     case 'slickpay': return !!getEnv('SLICKPAY_PUBLIC_KEY')
     case 'guiddini': return !!(getEnv('GUIDDINI_APP_KEY') && getEnv('GUIDDINI_APP_SECRET'))
+    case 'paystack': return !!getEnv('PAYSTACK_SECRET_KEY')
+    case 'mollie':   return !!getEnv('MOLLIE_API_KEY')
+    case 'coinbase': return !!getEnv('COINBASE_COMMERCE_API_KEY')
+    case 'nowpayments': return !!getEnv('NOWPAYMENTS_API_KEY')
     case 'manual':   return true // aucun secret requis
     default:         return false
   }
@@ -60,15 +68,22 @@ function instantiate(name: ProviderName) {
     case 'paypal':   return createPayPalProvider()
     case 'slickpay': return createSlickPayProvider()
     case 'guiddini': return createGuiddiniProvider()
+    case 'paystack': return createPaystackProvider()
+    case 'mollie':   return createMollieProvider()
+    case 'coinbase': return createCoinbaseProvider()
+    case 'nowpayments': return createNowPaymentsProvider()
     case 'manual':   return createManualProvider()
     default:         return null
   }
 }
 
-// Ordre = résolution par devise (spécifiques DZD avant Stripe joker). Les
-// agrégateurs DZ (chargily/slickpay/guiddini) et SATIM partagent DZD : le 1er
-// configuré gagne pour getProviderForCurrency ; sinon cibler via providerName.
-const DEFAULT_ORDER: ProviderName[] = ['chargily', 'slickpay', 'guiddini', 'satim', 'paypal', 'stripe']
+// Ordre = résolution par devise (spécifiques avant Stripe joker). Les agrégateurs
+// DZ (chargily/slickpay/guiddini) et SATIM partagent DZD : le 1er configuré gagne
+// pour getProviderForCurrency ; sinon cibler via providerName. Paystack (devises
+// africaines) et Mollie (EUR/GBP) sont à devises spécifiques → avant Stripe.
+// CRYPTO (coinbase/nowpayments, joker '*') exclus par défaut comme `manual` :
+// opt-in explicite via `providers:[...]` ou `providerName` (sinon capteraient toutes les devises).
+const DEFAULT_ORDER: ProviderName[] = ['chargily', 'slickpay', 'guiddini', 'satim', 'paystack', 'mollie', 'paypal', 'stripe']
 
 /**
  * Enregistre dans le registre les providers configurés via l'environnement

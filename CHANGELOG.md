@@ -4,6 +4,34 @@
 
 Format [Keep a Changelog](https://keepachangelog.com/) · versionnage [SemVer](https://semver.org/).
 
+## [0.8.0] — 2026-06-07 — Dialectes vague 2 : Coinbase, NOWPayments, Paystack, Mollie
+
+Vague 2 de l'état de l'art : crypto + international.
+Conception : `docs/DESIGN-DIALECTES-VAGUE2.md`.
+
+### Added
+- **`CoinbaseProvider`** / `createCoinbaseProvider` — crypto via Coinbase Commerce
+  (`POST /charges`), webhook **HMAC-SHA256** (`X-CC-Webhook-Signature`), `mapEvent`.
+  Env `COINBASE_COMMERCE_API_KEY` / `_WEBHOOK_SECRET`. **Opt-in** (joker devise).
+- **`NowPaymentsProvider`** / `createNowPaymentsProvider` — crypto via invoice,
+  IPN **HMAC-SHA512 sur JSON aux clés triées** (`x-nowpayments-sig`), `mapStatus`.
+  Env `NOWPAYMENTS_API_KEY` / `_IPN_SECRET`. **Opt-in**.
+- **`PaystackProvider`** / `createPaystackProvider` — Afrique (NGN/GHS/ZAR/KES),
+  `transaction/initialize`, webhook **HMAC-SHA512** (`x-paystack-signature`),
+  `reference` = orderId. Env `PAYSTACK_SECRET_KEY`.
+- **`MollieProvider`** / `createMollieProvider` — Europe (EUR/GBP : iDEAL/SEPA/cartes/
+  Apple-Google Pay), `POST /payments`, webhook **non signé → re-fetch statut**
+  (`getPayment`), `mapStatus`. Env `MOLLIE_API_KEY`.
+- Engine : `ProviderName` += `coinbase|nowpayments|paystack|mollie` ; `KNOWN_PROVIDERS`,
+  `getProviderByName`, `pickSignatureHeader`, `CURRENCY_TO_PROVIDER` (NGN/GHS/ZAR/KES→paystack),
+  `auto-register` (Paystack/Mollie auto si clés ; **crypto opt-in** comme `manual`).
+- Tests T13 (héritage+mapping+câblage) et T14 (settle avec **signatures HMAC réelles**
+  Coinbase/NOWPayments/Paystack + Mollie par statut, hors-ligne). Suite : **101/101**.
+
+### Notes
+- Rétro-compatible. Crypto exclus du routage devise par défaut (opt-in `providers:[…]`
+  ou `providerName`) pour ne pas capter toutes les devises.
+
 ## [0.7.0] — 2026-06-07 — Dialectes Algérie : SATIM durci + SlickPay + Guiddini
 
 Vague 1 de l'état de l'art (`docs/01-ETUDE-ETAT-ART-PAYMENT-07062026.md`) — couvre
