@@ -13,6 +13,24 @@ export {
   listProviders, getProviderForCurrency, resetProviders,
 } from './core/payment-engine.js'
 
+// ─── Dialecte de paiement : base abstraite (modèle dialect ORM) — v0.6 ───
+export { AbstractPaymentProvider } from './core/abstract-provider.js'
+
+// ─── Orchestration checkout↔persistance↔webhook — v0.6 ───
+export {
+  createPaymentCheckout, settlePaymentFromWebhook,
+} from './core/checkout-service.js'
+export type {
+  CreateCheckoutInput, CreateCheckoutOutput,
+  SettleWebhookInput, SettleWebhookOutput,
+} from './core/checkout-service.js'
+
+// Auto-enregistrement des providers depuis l'environnement (v0.5.4+)
+export {
+  registerProvidersFromEnv, ensureProvidersFromEnv, resetEnsuredProviders,
+} from './core/auto-register.js'
+export type { AutoRegisterOptions } from './core/auto-register.js'
+
 // ─── Providers ──────────────────────────────────
 export { SatimProvider, createSatimProvider } from './providers/satim.provider.js'
 export type { SatimConfig } from './providers/satim.provider.js'
@@ -42,6 +60,26 @@ export { getPaymentRepo, resetPaymentRepo } from './lib/payment-factory.js'
 // ─── API handlers ───────────────────────────────
 export { createCheckoutHandler } from './api/checkout.route.js'
 export { createPaymentHandlers } from './api/payments.route.js'
+
+// ─── Webhook helpers (provider-agnostic) — v0.5.0+ ───
+export {
+  handleProviderWebhook,
+  pickSignatureHeader,
+  getProviderByName,
+  isPaidEvent,
+  isFailedEvent,
+  isRefundedEvent,
+  extractOrderId,
+  KNOWN_PROVIDERS,
+  isKnownProvider,
+  pickProviderByCurrency,
+  CURRENCY_TO_PROVIDER,
+} from './lib/webhook-helpers.js'
+export type {
+  ProviderName,
+  HandleProviderWebhookArgs,
+  HandleProviderWebhookResult,
+} from './lib/webhook-helpers.js'
 
 // ─── Module info ────────────────────────────────
 export { getSchemas, moduleInfo } from './lib/module-info.js'

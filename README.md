@@ -67,6 +67,48 @@ import { PaymentPage } from '@mostajs/payment'
 />
 ```
 
+### Dialectes & orchestration (v0.6, server-side)
+
+Chaque fournisseur est un **dialecte de paiement** (modèle calqué sur les
+dialectes de `@mostajs/orm`). La couche d'orchestration crée le checkout chez le
+bon dialecte **et persiste** la `Payment`, puis la règle au webhook — sans recopier
+ce collage dans l'app.
+
+```typescript
+import {
+  ensureProvidersFromEnv, createPaymentCheckout, settlePaymentFromWebhook,
+} from '@mostajs/payment/server'
+
+ensureProvidersFromEnv()   // enregistre les dialectes configurés dans .env (cascade MOSTA_ENV)
+
+// 1) Créer un paiement (sélection du dialecte par devise : DZD → Chargily)
+const { checkout, payment } = await createPaymentCheckout({
+  dialect,                              // IDialect @mostajs/data-plug
+  orderId: campaignId,
+  amount: 50000, currency: 'DZD',       // unités de base (PAS centimes)
+  successUrl, cancelUrl, webhookUrl,
+  metadata: { campaignId, planSlug: 'gold' },
+})
+// → redirige l'utilisateur vers checkout.url ; payment.status === 'pending'
+
+// 2) Webhook : régler la Payment + déclencher le métier
+export async function POST(req: Request) {
+  const s = await settlePaymentFromWebhook({
+    dialect, providerName: 'chargily',
+    body: await req.text(), headers: req.headers,
+  })
+  if (!s.ok) return Response.json({ error: s.reason }, { status: 400 })
+  if (s.status === 'paid') {
+    // activer la campagne sponsor (logique métier du consommateur)
+  }
+  return Response.json({ received: true })
+}
+```
+
+Clés (y compris **clés de test** `sk_test_`/`test_sk_`) lues depuis le `.env` via
+`@mostajs/config` — jamais en dur dans le code. Le `ManualProvider` permet de
+confirmer un virement/cash hors-ligne (`POST { orderId, status:'paid' }`).
+
 ## API
 
 | Export | Entry | Description |
@@ -80,6 +122,9 @@ import { PaymentPage } from '@mostajs/payment'
 | `createCheckoutHandler(config)` | `./server` | Next.js checkout route |
 | `createPaymentHandlers(dialect)` | `./server` | CRUD route handlers |
 | `getPaymentRepo(dialect)` | `./server` | Payment repository |
+| `AbstractPaymentProvider` | `./server` | Base de dialecte (v0.6) — étendue par les 5 providers |
+| `createPaymentCheckout(input)` | `./server` | Checkout + persistance `Payment` (v0.6) |
+| `settlePaymentFromWebhook(input)` | `./server` | Vérifie le webhook + règle la `Payment` (v0.6) |
 
 ## Environment
 

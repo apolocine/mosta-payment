@@ -1,11 +1,18 @@
 # @mostajs/payment — fiche LLM
 > Module de paiement multi-provider (Stripe, Satim/CIB, Chargily, PayPal, Manuel), multi-méthode, multi-devise.
 
-- Version: 0.5.3 · Licence: AGPL-3.0-or-later · Auteur: Dr Hamid MADANI <drmdh@msn.com>
+- Version: 0.6.0 · Licence: AGPL-3.0-or-later · Auteur: Dr Hamid MADANI <drmdh@msn.com>
 - Chemin: mostajs/mosta-payment · Statut audit: complet (dist/)
 
 ## RÔLE
 Abstraction unifiée du paiement pour l'écosystème `@mostajs/*`. Un contrat `PaymentProvider` commun couvre 5 providers (Stripe, Satim, Chargily, PayPal, Manuel). Fournit checkout, webhooks normalisés, billing/abonnements (Stripe), schéma ORM `Payment`, composant React `PaymentPage` et handlers de routes Next.js App Router. Sélection automatique du provider par devise (DZD → Chargily, autres → Stripe).
+
+## MODÈLE DIALECTE (v0.6) — calqué sur @mostajs/orm
+Chaque **fournisseur = un dialecte de paiement**, exactement comme un dialecte ORM :
+- `PaymentProvider` (contrat) ≡ `IDialect`.
+- `AbstractPaymentProvider` (base, v0.6) ≡ `AbstractSqlDialect` : méthodes *template* publiques `createCheckout`/`verifyWebhook` (validation + garantie `metadata.orderId` + garde de devise) qui délèguent aux *primitives* `protected abstract doCheckout`/`doVerifyWebhook`. Les 5 providers l'étendent.
+- `payment-engine` (register/get/forCurrency) ≡ registre des dialectes.
+- **Orchestration** `createPaymentCheckout` / `settlePaymentFromWebhook` (v0.6) ≡ `BaseRepository`/`createConnection` : *utilise* un dialecte + persiste la ligne `Payment` (data-plug), sans réimplémenter la logique fournisseur.
 
 ## INSTALLATION
 npm i @mostajs/payment stripe
@@ -20,6 +27,9 @@ Entrée `.` (client + serveur léger) :
 ## EXPORTS PAR SOUS-CHEMIN
 Entrée `@mostajs/payment/server` (serveur uniquement) :
 - Engine: `registerProvider`, `setDefaultProvider`, `getProvider`, `listProviders`, `getProviderForCurrency`, `resetProviders`
+- Dialecte base (v0.6): `AbstractPaymentProvider` (classe abstraite — étendue par les 5 providers)
+- Orchestration (v0.6): `createPaymentCheckout(input)`, `settlePaymentFromWebhook(input)` + types `CreateCheckoutInput`/`CreateCheckoutOutput`/`SettleWebhookInput`/`SettleWebhookOutput`
+- Auto-enregistrement (v0.5.4+): `registerProvidersFromEnv(opts?)`, `ensureProvidersFromEnv(opts?)`, `resetEnsuredProviders()` + type `AutoRegisterOptions`
 - Providers (classes + factories env): `StripeProvider`/`createStripeProvider`, `SatimProvider`/`createSatimProvider`, `ChargilyProvider`/`createChargilyProvider`, `PayPalProvider`/`createPayPalProvider`, `ManualProvider`/`createManualProvider`
 - Stripe bas niveau: `createStripeClient`, `createCheckoutSession`, `handleWebhook`, `createBillingSession`, `createPortalSession`, `handleBillingWebhook`
 - Webhook helpers: `handleProviderWebhook`, `pickSignatureHeader`, `getProviderByName`, `isPaidEvent`, `isFailedEvent`, `isRefundedEvent`, `extractOrderId`, `pickProviderByCurrency`, `isKnownProvider`, constantes `KNOWN_PROVIDERS`, `CURRENCY_TO_PROVIDER`
@@ -34,7 +44,11 @@ Entrée `@mostajs/payment/server` (serveur uniquement) :
 - `createPaymentHandlers(dialect: IDialect): { GET; POST }`
 - `getPaymentRepo(dialect: IDialect): BaseRepository<PaymentDTO>` — cache WeakMap par identité du dialect
 - `registerProvider(p: PaymentProvider): void` · `setDefaultProvider(name): void` · `getProvider(name?): PaymentProvider` · `getProviderForCurrency(currency): PaymentProvider | null`
+- `registerProvidersFromEnv(opts?: { providers?: ProviderName[]; setDefault?: ProviderName; force?: boolean }): string[]` — enregistre depuis l'env (cascade `MOSTA_ENV`) les providers configurés ; ordre = résolution devise (Chargily/Satim avant Stripe). `manual` exclu sauf si listé.
+- `ensureProvidersFromEnv(opts?): string[]` — variante idempotente « une fois par process » (à appeler en tête de route handler) · `resetEnsuredProviders(): void` (tests)
 - `pickProviderByCurrency(currency, fallback?: ProviderName): { name; provider }`
+- `createPaymentCheckout(input: { dialect: IDialect; orderId; amount; currency; successUrl; cancelUrl; webhookUrl?; description?; method?: PaymentMethodType; metadata?; providerName? }): Promise<{ payment: PaymentDTO; checkout: CheckoutResult; provider: string }>` — sélectionne le dialecte (explicite > registre/devise > mapping), crée le checkout ET persiste la `Payment` (status 'pending', provider, transactionRef=sessionId, orderId, metadata)
+- `settlePaymentFromWebhook(input: { dialect: IDialect; providerName: ProviderName; body: string; headers }): Promise<{ ok; reason?; event?; orderId?; status?: PaymentStatus; payment?: PaymentDTO|null }>` — vérifie le webhook, mappe l'event (paid/failed/refunded), retrouve la `Payment` par `orderId` et la met à jour (paidAt si paid). Le métier post-paiement reste au caller.
 - `handleProviderWebhook(args: HandleProviderWebhookArgs): Promise<HandleProviderWebhookResult>`
 - `isPaidEvent/isFailedEvent/isRefundedEvent(event: WebhookEvent): boolean` · `extractOrderId(event): string | null`
 - Stripe: `createStripeClient(config)`, `createCheckoutSession(stripe, request, config)`, `handleWebhook(stripe, body, sig, secret)`, `createBillingSession(stripe, {...})`, `createPortalSession(stripe, customerId, returnUrl)`, `handleBillingWebhook(stripe, body, sig, secret, handlers)`
@@ -51,7 +65,7 @@ Interface `PaymentProvider` : `name`, `supportedCurrencies`, `supportedMethods`,
 - `CheckoutParams { orderId; amount; currency?; description?; successUrl; cancelUrl; webhookUrl?; metadata?; customerId?; priceId?; trialDays? }`
 - `WebhookEvent { type: string; data: Record<string,unknown>; raw? }`
 - `HandleProviderWebhookResult = { ok: true; event: WebhookEvent } | { ok: false; reason: 'bad_signature'|'malformed'|'unknown_provider'; error: string }`
-- `PaymentDTO { id; amount; currency; method: PaymentMethodType; status: PaymentStatus; transactionRef?; paidAt?: Date; orderId? }`
+- `PaymentDTO { id; amount; currency; method: PaymentMethodType; status: PaymentStatus; transactionRef?; paidAt?: Date; orderId?; provider?; metadata? }` (provider/metadata ajoutés v0.6 ; schéma `Payment` = 9 champs + index sur `orderId`)
 - `WebhookHandlers { onCheckoutCompleted?; onInvoicePaid?; onSubscriptionUpdated?; onSubscriptionDeleted?; onPaymentFailed? }`
 
 ## PATTERN
@@ -70,6 +84,17 @@ import { handleProviderWebhook, isPaidEvent, extractOrderId } from '@mostajs/pay
 const r = await handleProviderWebhook({ body: await req.text(), headers: req.headers, providerName: 'chargily' })
 if (!r.ok) return Response.json({ error: r.error }, { status: 400 })
 if (isPaidEvent(r.event)) { /* MAJ DB métier via extractOrderId(r.event) */ }
+
+// Orchestration v0.6 — checkout + persistance en un appel
+import { ensureProvidersFromEnv, createPaymentCheckout, settlePaymentFromWebhook } from '@mostajs/payment/server'
+ensureProvidersFromEnv()                         // dialectes depuis .env (cascade MOSTA_ENV)
+const { checkout } = await createPaymentCheckout({
+  dialect, orderId, amount: 50000, currency: 'DZD',   // → Chargily
+  successUrl, cancelUrl, webhookUrl, metadata: { campaignId },
+})
+// route webhook :
+const s = await settlePaymentFromWebhook({ dialect, providerName: 'chargily', body: await req.text(), headers: req.headers })
+if (s.status === 'paid') { /* activer la campagne sponsor (métier) */ }
 ```
 
 ## DÉPEND DE

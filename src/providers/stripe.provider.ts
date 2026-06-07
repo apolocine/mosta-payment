@@ -4,17 +4,18 @@
 import Stripe from 'stripe'
 import { getEnv } from '@mostajs/config'
 import type {
-  PaymentProvider, CheckoutParams, CheckoutResult, CustomerParams,
+  CheckoutParams, CheckoutResult, CustomerParams,
   SubscriptionParams, SubscriptionResult, RefundParams, RefundResult,
   InvoiceResult, WebhookEvent,
 } from '../core/provider.interface.js'
+import { AbstractPaymentProvider } from '../core/abstract-provider.js'
 
 export interface StripeConfig {
   secretKey: string
   webhookSecret?: string
 }
 
-export class StripeProvider implements PaymentProvider {
+export class StripeProvider extends AbstractPaymentProvider {
   readonly name = 'stripe'
   readonly supportedCurrencies = ['*'] // all currencies
   readonly supportedMethods = ['card']
@@ -22,13 +23,14 @@ export class StripeProvider implements PaymentProvider {
   public stripe: Stripe
 
   constructor(private config: StripeConfig) {
+    super()
     if (!config.secretKey) throw new Error('[stripe] secretKey is required')
     this.stripe = new Stripe(config.secretKey)
   }
 
   // ─── Checkout ─────────────────────────────────
 
-  async createCheckout(params: CheckoutParams): Promise<CheckoutResult> {
+  protected async doCheckout(params: CheckoutParams): Promise<CheckoutResult> {
     if (params.priceId && params.customerId) {
       // Subscription billing
       const sessionParams: any = {
@@ -204,7 +206,7 @@ export class StripeProvider implements PaymentProvider {
 
   // ─── Webhooks ─────────────────────────────────
 
-  async verifyWebhook(body: string, signature: string): Promise<WebhookEvent> {
+  protected async doVerifyWebhook(body: string, signature: string): Promise<WebhookEvent> {
     if (!this.config.webhookSecret) throw new Error('[stripe] webhookSecret required for webhook verification')
     const event = this.stripe.webhooks.constructEvent(body, signature, this.config.webhookSecret)
 

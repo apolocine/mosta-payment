@@ -80,4 +80,8 @@ export interface PaymentDTO {
   transactionRef?: string
   paidAt?: Date
   orderId?: string
+  /** Nom du dialecte (provider) ayant émis le checkout — v0.6 */
+  provider?: string
+  /** Contexte métier propagé au provider et restitué au webhook — v0.6 */
+  metadata?: Record<string, unknown>
 }

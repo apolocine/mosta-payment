@@ -2,7 +2,8 @@
 // Author: Dr Hamid MADANI drmdh@msn.com
 // Ref: https://test.satim.dz/payment/rest/ (sandbox)
 
-import type { PaymentProvider, CheckoutParams, CheckoutResult, WebhookEvent } from '../core/provider.interface.js'
+import type { CheckoutParams, CheckoutResult, WebhookEvent } from '../core/provider.interface.js'
+import { AbstractPaymentProvider } from '../core/abstract-provider.js'
 import { getEnv, getEnvBool } from '@mostajs/config'
 
 export interface SatimConfig {
@@ -15,7 +16,7 @@ export interface SatimConfig {
   currencyCode?: string
 }
 
-export class SatimProvider implements PaymentProvider {
+export class SatimProvider extends AbstractPaymentProvider {
   readonly name = 'satim'
   readonly supportedCurrencies = ['DZD']
   readonly supportedMethods = ['cib']
@@ -23,12 +24,13 @@ export class SatimProvider implements PaymentProvider {
   private baseUrl: string
 
   constructor(private config: SatimConfig) {
+    super()
     this.baseUrl = config.testMode
       ? 'https://test.satim.dz/payment/rest'
       : 'https://cib.satim.dz/payment/rest'
   }
 
-  async createCheckout(params: CheckoutParams): Promise<CheckoutResult> {
+  protected async doCheckout(params: CheckoutParams): Promise<CheckoutResult> {
     const body = new URLSearchParams({
       orderNumber: params.orderId,
       amount: String(Math.round(params.amount * 100)), // centimes DZD
@@ -103,7 +105,7 @@ export class SatimProvider implements PaymentProvider {
     return res.json()
   }
 
-  async verifyWebhook(body: string, _signature: string): Promise<WebhookEvent> {
+  protected async doVerifyWebhook(body: string, _signature: string): Promise<WebhookEvent> {
     // Satim uses redirect-based callbacks, not webhooks
     // Parse the callback params
     const params = new URLSearchParams(body)

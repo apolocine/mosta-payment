@@ -3,7 +3,8 @@
 // Ref: https://dev.chargily.com/pay-v2/api-reference/
 // GitHub: https://github.com/chargily
 
-import type { PaymentProvider, CheckoutParams, CheckoutResult, CustomerParams, WebhookEvent } from '../core/provider.interface.js'
+import type { CheckoutParams, CheckoutResult, CustomerParams, WebhookEvent } from '../core/provider.interface.js'
+import { AbstractPaymentProvider } from '../core/abstract-provider.js'
 import { getEnv } from '@mostajs/config'
 import { createHmac } from 'node:crypto'
 
@@ -15,7 +16,7 @@ export interface ChargilyConfig {
   webhookUrl?: string
 }
 
-export class ChargilyProvider implements PaymentProvider {
+export class ChargilyProvider extends AbstractPaymentProvider {
   readonly name = 'chargily'
   readonly supportedCurrencies = ['DZD']
   readonly supportedMethods = ['cib', 'edahabia']
@@ -23,6 +24,7 @@ export class ChargilyProvider implements PaymentProvider {
   private baseUrl: string
 
   constructor(private config: ChargilyConfig) {
+    super()
     this.baseUrl = config.testMode
       ? 'https://pay.chargily.net/test/api/v2'
       : 'https://pay.chargily.net/api/v2'
@@ -35,7 +37,7 @@ export class ChargilyProvider implements PaymentProvider {
     }
   }
 
-  async createCheckout(params: CheckoutParams): Promise<CheckoutResult> {
+  protected async doCheckout(params: CheckoutParams): Promise<CheckoutResult> {
     const res = await fetch(`${this.baseUrl}/checkouts`, {
       method: 'POST',
       headers: this.headers(),
@@ -90,40 +92,66 @@ export class ChargilyProvider implements PaymentProvider {
     return res.json()
   }
 
-  async verifyWebhook(body: string, signature: string): Promise<WebhookEvent> {
+  protected async doVerifyWebhook(body: string, signature: string): Promise<WebhookEvent> {
     // Chargily signs with HMAC-SHA256 using the API key as secret
     const computed = createHmac('sha256', this.config.apiKey).update(body).digest('hex')
     if (computed !== signature) {
       throw new Error('[chargily] Invalid webhook signature')
     }
 
-    const data = JSON.parse(body)
-    const type = data.status === 'paid' ? 'payment.success'
-      : data.status === 'failed' ? 'payment.failed'
-      : data.status === 'canceled' ? 'payment.canceled'
-      : 'payment.pending'
+    const raw = JSON.parse(body)
+
+    // Chargily Pay v2 wrappe le checkout dans un event object :
+    //   { id, entity:'event', type:'checkout.paid', data: <Checkout>, ... }
+    // Les anciens flows / tests directs envoient juste le Checkout
+    // (sans wrapper). On supporte les 2.
+    const isEventWrapper = raw?.entity === 'event' && raw?.data
+    const checkout = isEventWrapper ? raw.data : raw
+    const explicitEventType: string | null =
+      isEventWrapper && typeof raw.type === 'string' ? raw.type : null
+
+    // Type d'event normalisé : utilise le `type` explicite Chargily v2
+    // s'il est présent (`checkout.paid`/`checkout.failed`/`checkout.canceled`),
+    // sinon fallback sur le mapping via `checkout.status`.
+    let type: string
+    if (explicitEventType) {
+      type = explicitEventType
+    } else {
+      type = checkout.status === 'paid' ? 'payment.success'
+        : checkout.status === 'failed' ? 'payment.failed'
+        : checkout.status === 'canceled' ? 'payment.canceled'
+        : 'payment.pending'
+    }
 
     return {
       type,
       data: {
-        checkoutId: data.id,
-        amount: data.amount,
-        currency: data.currency,
-        status: data.status,
-        metadata: data.metadata,
-        orderId: data.metadata?.orderId,
+        checkoutId: checkout.id,
+        amount: checkout.amount,
+        currency: checkout.currency,
+        status: checkout.status,
+        metadata: checkout.metadata,
+        orderId: checkout.metadata?.orderId,
       },
-      raw: data,
+      raw,
     }
   }
 }
 
 /**
  * Create a Chargily provider from environment variables.
+ *
+ * Convention env (cohérence avec Stripe `STRIPE_SECRET_KEY`) :
+ *   - `CHARGILY_SECRET_KEY` (recommandé) — clé secrète côté serveur
+ *   - `CHARGILY_API_KEY` (legacy alias) — gardé pour rétro-compat des
+ *     déploiements existants. À retirer dans une future major version.
+ *
+ * `getEnv()` résout la cascade @mostajs/config (`PROD_*`/`TEST_*`/`DEV_*`
+ * selon `MOSTA_ENV`) puis fallback non-préfixé.
  */
 export function createChargilyProvider(config?: Partial<ChargilyConfig>): ChargilyProvider {
   return new ChargilyProvider({
-    apiKey: config?.apiKey ?? getEnv('CHARGILY_API_KEY', ''),
+    apiKey: config?.apiKey ?? getEnv('CHARGILY_SECRET_KEY') ?? getEnv('CHARGILY_API_KEY', ''),
     testMode: config?.testMode ?? getEnv('CHARGILY_TEST_MODE') !== 'false',
     successUrl: config?.successUrl ?? getEnv('CHARGILY_SUCCESS_URL', '/payment/success'),
     failureUrl: config?.failureUrl ?? getEnv('CHARGILY_FAILURE_URL', '/payment/failed'),

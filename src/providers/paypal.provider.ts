@@ -2,9 +2,9 @@
 // Author: Dr Hamid MADANI drmdh@msn.com
 // Ref: https://developer.paypal.com/docs/api/orders/v2/
 
-import type { PaymentProvider, CheckoutParams, CheckoutResult, RefundParams, RefundResult, WebhookEvent } from '../core/provider.interface.js'
+import type { CheckoutParams, CheckoutResult, RefundParams, RefundResult, WebhookEvent } from '../core/provider.interface.js'
+import { AbstractPaymentProvider } from '../core/abstract-provider.js'
 import { getEnv } from '@mostajs/config'
-import { createVerify } from 'node:crypto'
 
 export interface PayPalConfig {
   clientId: string
@@ -15,7 +15,7 @@ export interface PayPalConfig {
   webhookId?: string
 }
 
-export class PayPalProvider implements PaymentProvider {
+export class PayPalProvider extends AbstractPaymentProvider {
   readonly name = 'paypal'
   readonly supportedCurrencies = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF']
   readonly supportedMethods = ['paypal']
@@ -24,6 +24,7 @@ export class PayPalProvider implements PaymentProvider {
   private tokenCache: { token: string; expiresAt: number } | null = null
 
   constructor(private config: PayPalConfig) {
+    super()
     this.baseUrl = config.testMode
       ? 'https://api-m.sandbox.paypal.com'
       : 'https://api-m.paypal.com'
@@ -70,7 +71,7 @@ export class PayPalProvider implements PaymentProvider {
     return res.status === 204 ? null : res.json()
   }
 
-  async createCheckout(params: CheckoutParams): Promise<CheckoutResult> {
+  protected async doCheckout(params: CheckoutParams): Promise<CheckoutResult> {
     const currency = (params.currency ?? 'USD').toUpperCase()
     const data = await this.api('POST', '/v2/checkout/orders', {
       intent: 'CAPTURE',
@@ -128,7 +129,7 @@ export class PayPalProvider implements PaymentProvider {
     }
   }
 
-  async verifyWebhook(body: string, signature: string): Promise<WebhookEvent> {
+  protected async doVerifyWebhook(body: string, signature: string): Promise<WebhookEvent> {
     // PayPal webhook verification requires calling their API
     // For simplicity, parse the event and validate via API
     const event = JSON.parse(body)

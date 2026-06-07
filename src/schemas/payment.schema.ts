@@ -30,12 +30,17 @@ export function createPaymentSchema(options?: {
       status:         { type: 'string', enum: ['pending', 'paid', 'refunded', 'failed'], default: 'pending' },
       transactionRef: { type: 'string' },
       paidAt:         { type: 'date' },
+      // ── Orchestration v0.6 (createPaymentCheckout / settlePaymentFromWebhook) ──
+      orderId:        { type: 'string' }, // clé de matching app ↔ webhook
+      provider:       { type: 'string' }, // dialecte ayant émis le checkout (stripe/chargily/…)
+      metadata:       { type: 'json' },   // contexte métier (campaignId, planSlug, …)
     },
 
     relations: {},
 
     indexes: [
       { fields: { status: 'asc' } },
+      { fields: { orderId: 'asc' } },
     ],
   }
 
