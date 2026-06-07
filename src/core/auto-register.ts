@@ -21,6 +21,8 @@ import { createChargilyProvider } from '../providers/chargily.provider.js'
 import { createSatimProvider } from '../providers/satim.provider.js'
 import { createPayPalProvider } from '../providers/paypal.provider.js'
 import { createManualProvider } from '../providers/manual.provider.js'
+import { createSlickPayProvider } from '../providers/slickpay.provider.js'
+import { createGuiddiniProvider } from '../providers/guiddini.provider.js'
 import type { ProviderName } from '../lib/webhook-helpers.js'
 
 export interface AutoRegisterOptions {
@@ -43,6 +45,8 @@ function isConfigured(name: ProviderName): boolean {
     case 'chargily': return !!(getEnv('CHARGILY_SECRET_KEY') ?? getEnv('CHARGILY_API_KEY'))
     case 'satim':    return !!getEnv('SATIM_MERCHANT_ID')
     case 'paypal':   return !!getEnv('PAYPAL_CLIENT_ID')
+    case 'slickpay': return !!getEnv('SLICKPAY_PUBLIC_KEY')
+    case 'guiddini': return !!(getEnv('GUIDDINI_APP_KEY') && getEnv('GUIDDINI_APP_SECRET'))
     case 'manual':   return true // aucun secret requis
     default:         return false
   }
@@ -54,12 +58,17 @@ function instantiate(name: ProviderName) {
     case 'chargily': return createChargilyProvider()
     case 'satim':    return createSatimProvider()
     case 'paypal':   return createPayPalProvider()
+    case 'slickpay': return createSlickPayProvider()
+    case 'guiddini': return createGuiddiniProvider()
     case 'manual':   return createManualProvider()
     default:         return null
   }
 }
 
-const DEFAULT_ORDER: ProviderName[] = ['chargily', 'satim', 'paypal', 'stripe']
+// Ordre = résolution par devise (spécifiques DZD avant Stripe joker). Les
+// agrégateurs DZ (chargily/slickpay/guiddini) et SATIM partagent DZD : le 1er
+// configuré gagne pour getProviderForCurrency ; sinon cibler via providerName.
+const DEFAULT_ORDER: ProviderName[] = ['chargily', 'slickpay', 'guiddini', 'satim', 'paypal', 'stripe']
 
 /**
  * Enregistre dans le registre les providers configurés via l'environnement

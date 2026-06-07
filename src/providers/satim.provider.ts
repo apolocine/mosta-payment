@@ -43,6 +43,10 @@ export class SatimProvider extends AbstractPaymentProvider {
     })
 
     if (params.description) body.set('description', params.description)
+    // jsonParams : champs libres (dont orderId) restitués dans getOrderStatusExtended
+    if (params.metadata && Object.keys(params.metadata).length) {
+      body.set('jsonParams', JSON.stringify(params.metadata))
+    }
 
     const res = await fetch(`${this.baseUrl}/register.do`, {
       method: 'POST',
@@ -105,21 +109,77 @@ export class SatimProvider extends AbstractPaymentProvider {
     return res.json()
   }
 
-  protected async doVerifyWebhook(body: string, _signature: string): Promise<WebhookEvent> {
-    // Satim uses redirect-based callbacks, not webhooks
-    // Parse the callback params
-    const params = new URLSearchParams(body)
-    const orderId = params.get('orderId') ?? ''
+  /**
+   * Statut SATIM/BPC enrichi par identifiant de commande SATIM (mdOrder).
+   * Champs clés : OrderStatus, OrderNumber (= notre orderId), Amount (centimes),
+   * actionCode, approvalCode, ErrorCode.
+   */
+  async getOrderStatusExtended(satimOrderId: string): Promise<Record<string, unknown>> {
+    const body = new URLSearchParams({
+      orderId: satimOrderId,
+      userName: this.config.merchantId,
+      password: this.config.password,
+      language: 'FR',
+    })
+    const res = await fetch(`${this.baseUrl}/getOrderStatusExtended.do`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    })
+    return res.json()
+  }
 
-    if (orderId) {
-      const status = await this.confirmOrder(orderId)
-      return {
-        type: status.paid ? 'payment.success' : 'payment.failed',
-        data: { orderId, ...status },
-      }
+  /**
+   * Mappe un code OrderStatus BPC vers un type d'event normalisé.
+   * Codes BPC : 0 enregistré · 1 pré-autorisé · 2 **autorisé/payé** ·
+   * 3 annulé · 4 remboursé · 5 ACS/3-DS en cours · 6 refusé.
+   */
+  static mapOrderStatus(code: number | string | undefined): string {
+    switch (String(code)) {
+      case '2': return 'payment.success'
+      case '4': return 'payment.refunded'
+      case '3':
+      case '6': return 'payment.failed'
+      default:  return 'payment.pending' // 0,1,5 ou inconnu
+    }
+  }
+
+  protected async doVerifyWebhook(body: string, _signature: string): Promise<WebhookEvent> {
+    // SATIM = callback PAR REDIRECTION (pas de webhook signé) : le handler de
+    // retour reçoit l'orderId SATIM (mdOrder) ; on confirme le statut côté serveur
+    // via getOrderStatusExtended. Accepte : querystring de retour, JSON {orderId},
+    // ou JSON déjà résolu (OrderStatus présent → pas d'appel réseau, testable).
+    const trimmed = body.trim()
+    let raw: Record<string, any> = {}
+    if (trimmed.startsWith('{')) { try { raw = JSON.parse(trimmed) } catch { raw = {} } }
+    else { raw = Object.fromEntries(new URLSearchParams(body)) }
+
+    const satimOrderId = raw.orderId ?? raw.mdOrder
+    let status: Record<string, any> = raw
+    if (raw.OrderStatus === undefined && raw.orderStatus === undefined && satimOrderId) {
+      status = await this.getOrderStatusExtended(String(satimOrderId))
     }
 
-    return { type: 'unknown', data: {} }
+    const code = status.OrderStatus ?? status.orderStatus
+    const orderNumber = status.OrderNumber ?? status.orderNumber ?? raw.orderNumber
+    const amount = status.Amount !== undefined ? Number(status.Amount) / 100 : undefined
+    const type = code !== undefined
+      ? SatimProvider.mapOrderStatus(code)
+      : (String(raw.actionCode) === '0' ? 'payment.success' : 'payment.pending')
+
+    return {
+      type,
+      data: {
+        orderId: orderNumber ?? satimOrderId, // OrderNumber = notre orderId (matching)
+        satimOrderId,
+        orderStatus: code,
+        amount,
+        currency: 'DZD',
+        approvalCode: status.approvalCode ?? status.ApprovalCode,
+        errorCode: status.ErrorCode ?? status.errorCode,
+      },
+      raw: status,
+    }
   }
 }
 

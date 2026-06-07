@@ -4,6 +4,32 @@
 
 Format [Keep a Changelog](https://keepachangelog.com/) · versionnage [SemVer](https://semver.org/).
 
+## [0.7.0] — 2026-06-07 — Dialectes Algérie : SATIM durci + SlickPay + Guiddini
+
+Vague 1 de l'état de l'art (`docs/01-ETUDE-ETAT-ART-PAYMENT-07062026.md`) — couvre
+la demande banques & marchands DZ (D1/D4 de `02-OPPORTUNITES…`).
+Conception : `docs/DESIGN-DIALECTES-DZ-SATIM-SLICKPAY-GUIDDINI.md`.
+
+### Added
+- **`SlickPayProvider`** / `createSlickPayProvider` — agrégateur DZ (CIB/EDAHABIA),
+  auth clé publique, `POST /users/invoices` + `getInvoice` + `mapStatus`. Base/chemins
+  pilotés par env (`SLICKPAY_*`).
+- **`GuiddiniProvider`** / `createGuiddiniProvider` — agrégateur DZ certifié SATIM,
+  auth `x-app-key`/`x-app-secret`, initiate + `getTransaction` + `mapStatus`. Env `GUIDDINI_*`.
+- **SATIM durci** : `getOrderStatusExtended.do`, `SatimProvider.mapOrderStatus(code)`
+  (codes BPC 0-6), `jsonParams` (metadata) au register ; `doVerifyWebhook` retourne
+  **`orderId = OrderNumber`** (matching fiable) et supporte un statut JSON résolu (offline).
+- Engine : `ProviderName` += `slickpay`|`guiddini` ; `KNOWN_PROVIDERS`,
+  `getProviderByName`, `pickSignatureHeader`, `auto-register` (isConfigured/instantiate/ordre).
+- Tests T10-T12 (héritage + mapping + câblage + settle via dialectes DZ, hors-ligne).
+  Suite : **80/80**.
+
+### Notes
+- Rétro-compatible : aucun export retiré. DZD reste routé vers Chargily par défaut ;
+  cibler SATIM/SlickPay/Guiddini via `providerName` (ou ordre/`setDefault` `.env`).
+- Chemins SlickPay/Guiddini provisoires (docs publiques JS) — **pilotés par env**,
+  à confirmer en certification GIE.
+
 ## [0.6.0] — 2026-06-07 — Modèle dialecte + orchestration checkout
 
 Extension (DEVRULES §9 cas B) — le module est restructuré sur le **modèle des

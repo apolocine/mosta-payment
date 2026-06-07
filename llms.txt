@@ -1,11 +1,11 @@
 # @mostajs/payment — fiche LLM
 > Module de paiement multi-provider (Stripe, Satim/CIB, Chargily, PayPal, Manuel), multi-méthode, multi-devise.
 
-- Version: 0.6.0 · Licence: AGPL-3.0-or-later · Auteur: Dr Hamid MADANI <drmdh@msn.com>
+- Version: 0.7.0 · Licence: AGPL-3.0-or-later · Auteur: Dr Hamid MADANI <drmdh@msn.com>
 - Chemin: mostajs/mosta-payment · Statut audit: complet (dist/)
 
 ## RÔLE
-Abstraction unifiée du paiement pour l'écosystème `@mostajs/*`. Un contrat `PaymentProvider` commun couvre 5 providers (Stripe, Satim, Chargily, PayPal, Manuel). Fournit checkout, webhooks normalisés, billing/abonnements (Stripe), schéma ORM `Payment`, composant React `PaymentPage` et handlers de routes Next.js App Router. Sélection automatique du provider par devise (DZD → Chargily, autres → Stripe).
+Abstraction unifiée du paiement pour l'écosystème `@mostajs/*`. Un contrat `PaymentProvider` commun couvre **7 dialectes** (Stripe, Satim, Chargily, PayPal, Manuel, **SlickPay**, **Guiddini**). Fournit checkout, webhooks normalisés, billing/abonnements (Stripe), schéma ORM `Payment`, composant React `PaymentPage` et handlers de routes Next.js App Router. Sélection automatique du provider par devise (DZD → Chargily par défaut, autres → Stripe ; cibler SATIM/SlickPay/Guiddini via `providerName`).
 
 ## MODÈLE DIALECTE (v0.6) — calqué sur @mostajs/orm
 Chaque **fournisseur = un dialecte de paiement**, exactement comme un dialecte ORM :
@@ -30,7 +30,7 @@ Entrée `@mostajs/payment/server` (serveur uniquement) :
 - Dialecte base (v0.6): `AbstractPaymentProvider` (classe abstraite — étendue par les 5 providers)
 - Orchestration (v0.6): `createPaymentCheckout(input)`, `settlePaymentFromWebhook(input)` + types `CreateCheckoutInput`/`CreateCheckoutOutput`/`SettleWebhookInput`/`SettleWebhookOutput`
 - Auto-enregistrement (v0.5.4+): `registerProvidersFromEnv(opts?)`, `ensureProvidersFromEnv(opts?)`, `resetEnsuredProviders()` + type `AutoRegisterOptions`
-- Providers (classes + factories env): `StripeProvider`/`createStripeProvider`, `SatimProvider`/`createSatimProvider`, `ChargilyProvider`/`createChargilyProvider`, `PayPalProvider`/`createPayPalProvider`, `ManualProvider`/`createManualProvider`
+- Providers/dialectes (classes + factories env): `StripeProvider`/`createStripeProvider`, `SatimProvider`/`createSatimProvider`, `ChargilyProvider`/`createChargilyProvider`, `PayPalProvider`/`createPayPalProvider`, `ManualProvider`/`createManualProvider`, **`SlickPayProvider`/`createSlickPayProvider`**, **`GuiddiniProvider`/`createGuiddiniProvider`** (+ configs `SlickPayConfig`/`GuiddiniConfig`). SATIM expose `getOrderStatusExtended` + statique `mapOrderStatus(code)` ; SlickPay/Guiddini exposent `mapStatus(raw)`.
 - Stripe bas niveau: `createStripeClient`, `createCheckoutSession`, `handleWebhook`, `createBillingSession`, `createPortalSession`, `handleBillingWebhook`
 - Webhook helpers: `handleProviderWebhook`, `pickSignatureHeader`, `getProviderByName`, `isPaidEvent`, `isFailedEvent`, `isRefundedEvent`, `extractOrderId`, `pickProviderByCurrency`, `isKnownProvider`, constantes `KNOWN_PROVIDERS`, `CURRENCY_TO_PROVIDER`
 - Repo: `getPaymentRepo`, `resetPaymentRepo`
@@ -57,7 +57,7 @@ Interface `PaymentProvider` : `name`, `supportedCurrencies`, `supportedMethods`,
 ## TYPES CLÉS
 - `PaymentStatus = 'pending'|'paid'|'refunded'|'failed'`
 - `PaymentMethodType = 'card'|'transfer'|'cash'|'tpe'`
-- `ProviderName = 'chargily'|'stripe'|'satim'|'paypal'|'manual'`
+- `ProviderName = 'chargily'|'stripe'|'satim'|'paypal'|'manual'|'slickpay'|'guiddini'`
 - `PaymentConfig { currency: string; defaultCurrency?; stripeSecretKey?; stripePublicKey?; stripeWebhookSecret?; successUrlTemplate: string; cancelUrlTemplate: string; methods?: PaymentMethodType[]; bankInfo?: { rib; bankName; holder } }` — templates avec `{orderId}` substitué
 - `LineItem { name; description?; unitAmount: number; quantity: number }` — unitAmount en unités de base (PAS en centimes)
 - `CheckoutRequest { orderId; lineItems: LineItem[]; currency?; returnUrl?; metadata? }`
@@ -110,6 +110,7 @@ if (s.status === 'paid') { /* activer la campagne sponsor (métier) */ }
 - Sélection devise : `CURRENCY_TO_PROVIDER` mappe DZD → Chargily, le reste → Stripe ; pour CIB-only Algérie sans Chargily, passer `fallback` à `pickProviderByCurrency`.
 - Les factories `create*Provider` lisent l'env en fallback (cascade `@mostajs/config`) ; defaults testMode : Chargily test-on (`!== 'false'`), Satim test-off (`=== 'true'`), PayPal test-on.
 - `ChargilyProvider` : préférer `CHARGILY_SECRET_KEY` ; `CHARGILY_API_KEY` est un alias legacy.
+- **Dialectes DZ (v0.7)** : `SatimProvider` (acquéreur direct, codes BPC OrderStatus, matching par `OrderNumber`), `SlickPayProvider` (env `SLICKPAY_PUBLIC_KEY` + base/chemins `SLICKPAY_BASE_URL`/`_INVOICE_PATH`), `GuiddiniProvider` (env `GUIDDINI_APP_KEY`/`_APP_SECRET` + `GUIDDINI_BASE_URL`/`_INITIATE_PATH`/`_STATUS_PATH`). DZD partagé : par défaut → Chargily ; cibler SATIM/SlickPay/Guiddini via `providerName` (ou ordre/`setDefault`). Confirmation par retour+statut (pas de HMAC) ; chemins SlickPay/Guiddini provisoires, pilotés par env, à confirmer en certification GIE.
 - `getPaymentRepo` met en cache via WeakMap par identité de dialect — un changement de dialect reconstruit le repo ; `resetPaymentRepo` est un no-op de rétro-compat.
 - Méthodes optionnelles de `PaymentProvider` (subscriptions, refunds…) : seul Stripe les implémente toutes ; vérifier la présence avant appel sur Satim/Chargily/Manual.
 

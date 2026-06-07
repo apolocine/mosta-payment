@@ -47,6 +47,13 @@ export type { StripeConfig } from './providers/stripe.provider.js'
 export { ManualProvider, createManualProvider } from './providers/manual.provider.js'
 export type { ManualConfig } from './providers/manual.provider.js'
 
+// Agrégateurs Algérie (CIB/EDAHABIA via SATIM) — v0.7
+export { SlickPayProvider, createSlickPayProvider } from './providers/slickpay.provider.js'
+export type { SlickPayConfig } from './providers/slickpay.provider.js'
+
+export { GuiddiniProvider, createGuiddiniProvider } from './providers/guiddini.provider.js'
+export type { GuiddiniConfig } from './providers/guiddini.provider.js'
+
 // ─── Legacy Stripe functions (backward compat) ─
 export {
   createStripeClient, createCheckoutSession, handleWebhook,

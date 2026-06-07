@@ -12,14 +12,16 @@ import { createStripeProvider } from '../providers/stripe.provider.js'
 import { createSatimProvider } from '../providers/satim.provider.js'
 import { createPayPalProvider } from '../providers/paypal.provider.js'
 import { createManualProvider } from '../providers/manual.provider.js'
+import { createSlickPayProvider } from '../providers/slickpay.provider.js'
+import { createGuiddiniProvider } from '../providers/guiddini.provider.js'
 import type { PaymentProvider, WebhookEvent } from '../core/provider.interface.js'
 
-export type ProviderName = 'chargily' | 'stripe' | 'satim' | 'paypal' | 'manual'
+export type ProviderName = 'chargily' | 'stripe' | 'satim' | 'paypal' | 'manual' | 'slickpay' | 'guiddini'
 
 /** Liste exhaustive des noms de provider supportés. À étendre dans ce
  *  module quand un nouveau provider est ajouté → tous les consumers
  *  bénéficient automatiquement. */
-export const KNOWN_PROVIDERS: readonly ProviderName[] = ['chargily', 'stripe', 'satim', 'paypal', 'manual']
+export const KNOWN_PROVIDERS: readonly ProviderName[] = ['chargily', 'stripe', 'satim', 'paypal', 'manual', 'slickpay', 'guiddini']
 
 /** Type-guard runtime — vrai si `name` est un ProviderName valide. */
 export function isKnownProvider(name: string): name is ProviderName {
@@ -83,6 +85,11 @@ export function pickSignatureHeader(headers: Headers | Record<string, string>, p
       return get('paypal-transmission-sig') || ''
     case 'manual':
       return get('x-signature') || ''
+    case 'slickpay':
+    case 'guiddini':
+      // Agrégateurs SATIM : confirmation par retour + interrogation statut
+      // (pas de webhook signé) → pas de header signature requis.
+      return ''
     default:
       return ''
   }
@@ -99,6 +106,8 @@ export function getProviderByName(name: ProviderName): PaymentProvider {
     case 'satim':    return createSatimProvider()
     case 'paypal':   return createPayPalProvider()
     case 'manual':   return createManualProvider()
+    case 'slickpay': return createSlickPayProvider()
+    case 'guiddini': return createGuiddiniProvider()
   }
 }
 
